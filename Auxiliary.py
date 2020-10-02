@@ -62,6 +62,15 @@ def set_crystal_orient(cryst, e, ang_dif_pl, flip=0):
     cryst.set_orient(nvx,nvy,nvz,tvx,tvy)
 
 ''' wf '''
+def get_field(wf):
+    srwl.SetRepresElecField(wf._srwl_wf, 't')
+    mesh = wf.params.Mesh
+    E_real = wf.get_real_part()
+    E_img = wf.get_imag_part()
+    axis_x = np.linspace(mesh.xMin, mesh.xMax, mesh.nx)
+    axis_y = np.linspace(mesh.yMin, mesh.yMax, mesh.ny)
+    return axis_x, axis_y, E_real, E_img
+
 def get_spectra(wf):
     # change the wavefront into frequency domain, where each slice in z represent a photon energy.
     srwl.SetRepresElecField(wf._srwl_wf, 'f')
@@ -114,6 +123,7 @@ def get_tilt(wf, ori='V'):
 
 ''' I/O '''
 def compress_save(wf, fname, ori='V'):
+    axis_x, axis_y, E_real, E_img = get_field(wf)
     aw, axis_ev, int0 = get_spectra(wf)
     _, axis_t, int1 = get_temporal(wf)
     axis, tilt = get_tilt(wf,ori=ori)
@@ -132,6 +142,20 @@ def compress_save(wf, fname, ori='V'):
         grp2 = f.create_group("temporal")
         grp2.create_dataset("axis", data=axis_t)
         grp2.create_dataset("intensity", data=int1)
+
+        grp3 = f.create_group("spatial")
+        grp3.create_dataset("x", data=axis_x)
+        grp3.create_dataset("y", data=axis_y)
+        grp3.create_dataset("E_real", data=E_real)
+        grp3.create_dataset("E_img", data=E_img)
+
+def get_field_from_file(fname):
+    with h5py.File(fname,'r') as f:
+        axis_x = f["spatial/x"][:]
+        axis_y = f["spatial/y"][:]
+        E_real = f["spatial/E_real"][:]
+        E_img = f["spatial/E_img"][:]
+    return axis_x, axis_y, E_real, E_img
 
 def get_spectra_from_file(fname):
     with h5py.File(fname,'r') as f:
@@ -172,6 +196,31 @@ def get_throughput_from_file(fname_in, fname_OE):
     return power_oe/power_in
 
 ''' plot wavefront '''
+def plot_spatial(axis_x, axis_y, E_real, E_img, label=None, if_log=0):
+    img = np.sum(E_real**2 + E_img**2, axis=-1)
+    title = 'profile at '+label
+    if if_log == 1:
+        img = np.log(img)
+        title = title+', log'
+    plt.imshow(img, cmap='jet',
+        extent = [axis_x.min()*1e6, axis_x.max()*1e6, axis_y.max()*1e6, axis_y.min()*1e6])
+    plt.colorbar()
+    if if_log == 1:
+        cmin = np.max(img) - 10
+        plt.clim(cmin)
+    plt.axis('tight')
+    plt.title(title,fontsize=18)
+    plt.xlabel(r'x ($\mu$m)',fontsize=18)
+    plt.ylabel(r'y ($\mu$m)',fontsize=18)
+
+def plot_spatial_from_wf(wf, label=None, if_log=0):
+    axis_x, axis_y, E_real, E_img = get_field(wf)
+    plot_spatial(axis_x, axis_y, E_real, E_img, label=label, if_log=if_log)
+
+def plot_spatial_from_file(fname, label=None, if_log=0):
+    axis_x, axis_y, E_real, E_img = get_field_from_file(fname)
+    plot_spatial(axis_x, axis_y, E_real, E_img, label=label, if_log=if_log)
+
 def plot_spectra(aw, axis_ev, int0, color, label=None):
     plt.plot(axis_ev, int0/int0.max(), color, label=label)
     plt.ylim([-0.1,1.1])
@@ -198,6 +247,9 @@ def plot_temporal(wf, color, label=None, fov=1e30, pulse_duration = None):
     plt.ylabel('normalized temporal energy', fontsize=18)
     return aw, axis_t, int0
 
+
+
+
 ''' wavefront tilting '''
 def plot_tilt(axis, tilt, axis_t, label=None, ori='V', if_log=0):
     tilt = tilt/tilt.max()
@@ -219,7 +271,7 @@ def plot_tilt(axis, tilt, axis_t, label=None, ori='V', if_log=0):
     plt.axis('tight')
     plt.title(title, fontsize=18)
     plt.xlabel('z'+r' ($\mu$m)', fontsize=18)
-    plt.ylabel('z'+r' ($\mu$m)', fontsize=18)
+    plt.ylabel(alabel+r' ($\mu$m)', fontsize=18)
 
 def plot_tilt_from_wf(wf, label=None, ori='V', if_log=0):
     axis, tilt = get_tilt(wf, ori=ori)
@@ -272,17 +324,6 @@ def plot_tilt_freq_from_file(fname, label=None, if_log=0):
     plot_tilt_freq(axis, tiltfft, axis_ev, label=label, ori=ori, if_log=if_log)
 
 ''' spatial profile '''
-def plot_spatial_from_wf(wf):
-    srwl.SetRepresElecField(wf._srwl_wf, 't')
-    [xmin, xmax, ymin, ymax] = wf.get_limits()
-    img = wf.get_intensity().sum(axis=-1)
-    plt.figure()
-    plt.imshow(img,cmap='jet',
-        extent = [xmin*1e6, xmax*1e6, ymin*1e6, ymax*1e6])
-    plt.colorbar()
-    plt.xlabel(r'x ($\mu$m)',fontsize=18)
-    plt.ylabel(r'y ($\mu$m)',fontsize=18)
-
 def plot_lineout(axis, lineout, color, label=None, fov=1e30, ori='V', if_log=1, if_norm=0):
     if ori == 'V':
         aname = 'y'
@@ -322,7 +363,8 @@ def plot_lineout_from_file(fname, color, label=None, fov=1e30, if_log=1, if_norm
 
 ''' quantification '''
 def calc_bandwidth(aw, axis_ev):
-    return np.abs(axis_ev[aw.max()] - axis_ev[aw.min()])
+    bw = np.abs(axis_ev[aw.max()] - axis_ev[aw.min()])
+    return bw
 
 def calc_spectral_response(aw, axis_ev, int_in, int_out):
     response = int_out/int_in
