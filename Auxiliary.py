@@ -12,11 +12,13 @@ from wpg.optical_elements import Aperture, Drift, CRL, Empty, Use_PP
 from wpg.generators import build_gauss_wavefront
 
 #import SRW core functions
-from wpg.srwlib import srwl, srwl_opt_setup_CRL, SRWLOptD, SRWLOptA, SRWLOptC, SRWLOptT, SRWLOptCryst
+from wpg.srwlib import srwl, srwl_opt_setup_CRL, SRWLOptD, SRWLOptA, SRWLOptC, SRWLOptT, SRWLOptCryst, SRWLOptAng, SRWLOptShift
 
 #import some helpers functions
 from wpg.wpg_uti_wf import propagate_wavefront, plot_t_wf, get_intensity_on_axis
 from wpg.wpg_uti_oe import show_transmission
+
+from scipy import interpolate
 
 ''' trivia '''
 def E2L(e):
@@ -248,8 +250,6 @@ def plot_temporal(wf, color, label=None, fov=1e30, pulse_duration = None):
     return aw, axis_t, int0
 
 
-
-
 ''' wavefront tilting '''
 def plot_tilt(axis, tilt, axis_t, label=None, ori='V', if_log=0):
     tilt = tilt/tilt.max()
@@ -431,3 +431,18 @@ def load_wavefront(nslice_t, dirname_prop):
         wf_holder.append(mwf_temp)
     return wf_holder
 
+''' multi-pulse '''
+def interp_wf(wf0, wf1):
+    # 2D interpolation that calculates wf0's value at wf1's axis
+    x0, y0, E_real0, E_img0 = get_field(wf0)
+    x1, y1, E_real1, E_img1 = get_field(wf1)
+    nx, ny, nz = E_real0.shape
+    
+    E_real_int = np.zeros((nx,ny,nz))
+    E_img_int = np.zeros((nx,ny,nz))
+    for i in range(nz):
+        f_real = interpolate.interp2d(x0, y0, E_real0[:,:,i], kind='cubic')
+        f_img = interpolate.interp2d(x0, y0, E_img0[:,:,i], kind='cubic')
+        E_real_int[:,:,i] = f_real(x1, y1)
+        E_img_int[:,:,i] = f_img(x1,y1)
+    return E_real_int, E_img_int
