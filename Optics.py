@@ -195,17 +195,17 @@ def Calc_OPD_and_AmpTr_Mirror(srwTr, heightProfData, theta):
     else:
         print('OE shape not matched')
 
-def Single_Prism(x,y,n,f,ori='x'):
+def Single_Prism(x,y,n,f,overlap,ori='x'):
     nx,ny = x.shape
     dl = x.max()-x.min()                    # width of the whole prism
-    #print('slope', slope)
+    dtheta = np.arctan(overlap/f)           # change in beam propagation direction
+    prism_phi = np.pi/2 - np.arctan(f*(1-n)/overlap)
+
     # For prism in x:
     z1 = np.zeros((nx,ny))                  # initialize prism
     index1 = x[0]>=0
     nn = index1.sum()
-    delta_d = x[:,-nn:] * (y.max()-y.min())/2/f  # OPD needed for phase shift
-    
-    z1[:,-nn:] = -delta_d/(n-1)             # assign height
+    z1[:,-nn:] = x[:,-nn:] * np.tan(prism_phi)
     z1 = z1 + np.fliplr(z1)
     # For prism in y
     z2 = 0
