@@ -113,8 +113,7 @@ class Prism:
             beam.wavey *= transmission
         
         # adjust beam direction
-        beam.ax += p1_x
-        beam.ay += p1_y
+        beam.rotate_beam(delta_ax=p1_x, delta_ay=p1_y)
 
     def propagate(self, beam):
         """
@@ -281,3 +280,81 @@ class CRL_no_abs:
         :return: None
         """
         self.multiply(beam)
+
+
+class Force_tilt:
+    """
+    Class to represent an arbitrary tilt in beam.
+
+    Attributes
+    ----------
+    name: str
+        Name of the device (e.g. PRM1)
+    delta_a: float
+        change in beam angle (rad)
+    orientation: int
+        defined as 0: to +x; 1: to +y
+    z: float
+        location along beamline
+    """
+    def __init__(self, name, delta_a=100e-6, z=0, orientation=0):
+        # set some attributes
+        self.name = name
+        self.delta_a = delta_a
+        self.z = z
+        self.orientation = orientation
+
+    def multiply(self, beam):
+        p1_x = 0
+        p1_y = 0
+        if self.orientation == 0:
+            p1_x = self.delta_a
+        if self.orientation == 1:
+            p1_y = self.delta_a
+
+        # adjust beam direction
+        beam.rotate_beam(delta_ax=p1_x, delta_ay=p1_y)
+
+    def propagate(self, beam):
+        """
+        Method to propagate beam through tilt. Calls multiply.
+        :param beam: Beam
+            Beam object to propagate through prism. Beam is modified by this method.
+        :return: None
+        """
+        self.multiply(beam)
+
+class Force_shift:
+    """
+    Class to represent an arbitrary tilt in beam.
+
+    Attributes
+    ----------
+    name: str
+        Name of the device (e.g. PRM1)
+    x_offset: float
+        change in beam position in x (m)
+    y_offset: float
+        change in beam position in y (m)
+    z: float
+        location along beamline
+    """
+    def __init__(self, name, x_offset=0, y_offset=0, z=0):
+        # set some attributes
+        self.name = name
+        self.x_offset = x_offset
+        self.y_offset = y_offset
+        self.z = z
+
+    def shift(self, beam):
+        # offset beam
+        beam.beam_offset(x_offset = self.x_offset, y_offset = self.y_offset)
+
+    def propagate(self, beam):
+        """
+        Method to propagate beam through manual offset. Calls shift.
+        :param beam: Beam
+            Beam object to propagate through prism. Beam is modified by this method.
+        :return: None
+        """
+        self.shift(beam)
