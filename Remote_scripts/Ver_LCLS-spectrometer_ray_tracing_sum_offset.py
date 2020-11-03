@@ -8,7 +8,7 @@ from Functions import *
 from LCLS_Optics import *
 
 ''' input parameters '''
-N = 512       # number of sampling points
+N = 256       # number of sampling points
 E0 = 9.9e3    # photon energy in eV
 z_off=.12     # distance offset between VCC crystal 1 and CC crystal 1
 d23=.2        # distance between VCC crystal 2 and 3
