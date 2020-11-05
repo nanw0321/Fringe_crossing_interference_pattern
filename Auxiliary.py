@@ -12,7 +12,7 @@ from wpg.optical_elements import Aperture, Drift, CRL, Empty, Use_PP
 from wpg.generators import build_gauss_wavefront
 
 #import SRW core functions
-from wpg.srwlib import srwl, srwl_opt_setup_CRL, SRWLOptD, SRWLOptA, SRWLOptC, SRWLOptT, SRWLOptCryst, SRWLOptAng, SRWLOptShift
+from wpg.srwlib import srwl, srwl_opt_setup_CRL, SRWLOptD, SRWLOptA, SRWLOptC, SRWLOptT, SRWLOptCryst, SRWLOptAng, SRWLOptL
 
 #import some helpers functions
 from wpg.wpg_uti_wf import propagate_wavefront, plot_t_wf, get_intensity_on_axis
@@ -28,18 +28,20 @@ def E2L(e):
     wavelength = 3e8/frequency
     return wavelength
 
-def mkdir_p(path):
-    """
-    Create directory with subfolders (like Linux mkdir -p)
+def mkdir(path):
+    if not os.path.exists(path):
+        print('make path')
+        os.mkdir(path)
+    else:
+        print('path exists')
 
-    :param path: Path to be created
-    """
-    try:
-        os.makedirs(path)
-    except OSError as exc: # Python >2.5
-        if exc.errno == errno.EEXIST and os.path.isdir(path):
-            pass
-        else: raise
+def calc_n(material, ekev):
+	cxro_data = np.genfromtxt('{}.csv'.format(material), delimiter=',')
+	energy = cxro_data[:, 0]
+	delta = cxro_data[:, 1]
+	beta = cxro_data[:, 2]
+	n = 1 - np.interp(ekev*1e3, energy, delta)
+	return n
 
 ''' crystals '''
 def calc_stretching(thetaB, ang_as, range_xy):
@@ -263,14 +265,16 @@ def plot_tilt(axis, tilt, axis_t, label=None, ori='V', if_log=0):
         tilt = np.log(tilt)
         title = title+', log'
     plt.imshow(tilt, cmap='jet',
-              extent = [axis_t.max()*3e8*1e6, axis_t.min()*3e8*1e6, axis.max()*1e6, axis.min()*1e6])
+              #extent = [axis_t.max()*3e8*1e6, axis_t.min()*3e8*1e6, axis.max()*1e6, axis.min()*1e6])
+              extent = [axis_t.max()*1e15, axis_t.min()*1e15, axis.max()*1e6, axis.min()*1e6])
     plt.colorbar()
     if if_log == 1:
         cmin = np.max(tilt)-10
         plt.clim(cmin)
     plt.axis('tight')
     plt.title(title, fontsize=18)
-    plt.xlabel('z'+r' ($\mu$m)', fontsize=18)
+    #plt.xlabel('z'+r' ($\mu$m)', fontsize=18)
+    plt.xlabel('t'+' (fs)', fontsize=18)
     plt.ylabel(alabel+r' ($\mu$m)', fontsize=18)
 
 def plot_tilt_from_wf(wf, label=None, ori='V', if_log=0):

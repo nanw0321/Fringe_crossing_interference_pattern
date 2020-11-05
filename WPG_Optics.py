@@ -11,8 +11,14 @@ def Square_Aperture(x,y,dx,dy,xoff=0.,yoff=0.):
     z[window] = 0.
     return z
 
-def Perfect_lens(x,y,n,f,xoff=0,yoff=0):
-    delta_d = f - np.sqrt(f**2-np.square(x-xoff)-np.square(y-yoff))
+def Perfect_lens(x,y,n,f,xoff=0,yoff=0,ori=2):
+    # ori: 0, x; 1, y; 2, both
+    if ori == 0:
+        delta_d = f - np.sqrt(f**2-np.square(x-xoff))
+    if ori == 1:
+        delta_d = f - np.sqrt(f**2-np.square(y-yoff))
+    if ori == 2:
+        delta_d = f - np.sqrt(f**2-np.square(x-xoff)-np.square(y-yoff))
     z = -delta_d/(n-1)
     return z
 
@@ -195,22 +201,26 @@ def Calc_OPD_and_AmpTr_Mirror(srwTr, heightProfData, theta):
     else:
         print('OE shape not matched')
 
-def Single_Prism(x,y,n,f,overlap,ori='x'):
+def Single_Prism(x,y,n,f,overlap,ori=0,dx=0, dy=0):
+    # ori: 0, thicker to +x; 1, thicker to +y
     nx,ny = x.shape
     dl = x.max()-x.min()                    # width of the whole prism
     dtheta = np.arctan(overlap/f)           # change in beam propagation direction
     prism_phi = np.pi/2 - np.arctan(f*(1-n)/overlap)
 
-    # For prism in x:
     z1 = np.zeros((nx,ny))                  # initialize prism
-    index1 = x[0]>=0
-    nn = index1.sum()
-    z1[:,-nn:] = x[:,-nn:] * np.tan(prism_phi)
-    z1 = z1 + np.fliplr(z1)
-    # For prism in y
-    z2 = 0
-    if ori == 'y':
-        z2 = z1.T
-        z1 = 0
-    z = z1+z2
-    return z
+
+    if ori in [0,2]:
+        index1 = x[0] > dx
+        nn = index1.sum()
+        z1[:,-nn:] = x[:,-nn:] * np.tan(prism_phi)
+        if ori == 0:
+            z1 = np.fliplr(z1)
+    if ori in [1,3]:
+        index1 = y[0] > dy
+        nn = index1.sum()
+        z1[-nn:,:] = y[-nn:,:] * np.tan(prism_phi)
+        if ori == 1:
+            z1 = np.flipud(z1)
+
+    return z1
